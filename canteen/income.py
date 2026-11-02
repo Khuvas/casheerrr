@@ -3,7 +3,6 @@ import csv
 import tkinter as tk
 from datetime import datetime
 from tkinter import filedialog, messagebox, ttk
-
 from common import make_tree, now, rp, selected_id
 from receipt import show_preview
 
