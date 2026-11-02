@@ -6,6 +6,7 @@ import tkinter as tk
 from tkinter import messagebox, ttk
 
 from common import make_tree, parse_int, rp, selected_id
+from receipt import show_preview
 
 
 class OrderService:
@@ -42,16 +43,16 @@ class OrderService:
         return lines, total
 
     def checkout(self, cart, paid, cashier):
-        """Complete a counter sale. paid=None means exact payment. Returns (total, change)."""
+        """Complete a counter sale. paid=None means exact payment. Returns (total, change, sale_id)."""
         with self.db:
             lines, total = self.reserve_stock(cart)
             if paid is None:
                 paid = total
             if paid < total:
                 raise ValueError(f"Cash received is short by {rp(total - paid)}.")
-            self.income.record_sale([(n, p, q) for _, n, p, q in lines],
-                                    total, paid, cashier, "counter")
-        return total, paid - total
+            sale_id = self.income.record_sale([(n, p, q) for _, n, p, q in lines],
+                                              total, paid, cashier, "counter")
+        return total, paid - total, sale_id
 
 
 class CartPicker(ttk.Frame):
@@ -218,10 +219,12 @@ class OrderTab(ttk.Frame):
         top = self.winfo_toplevel()
         try:
             paid = parse_int(self.paid.get(), "Cash received", allow_empty=True)
-            total, change = self.svc.checkout(self.picker.cart, paid, self.user["username"])
+            total, change, sale_id = self.svc.checkout(
+                self.picker.cart, paid, self.user["username"])
         except ValueError as e:
             messagebox.showerror("Error", str(e), parent=top)
             self.picker.refresh()
             return
         self.clear()
-        messagebox.showinfo("Sale recorded", f"Total: {rp(total)}\nChange: {rp(change)}", parent=top)
+        show_preview(top, self.svc.income.get_sale(sale_id))
+
