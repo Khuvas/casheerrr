@@ -11,6 +11,7 @@ from tkinter import messagebox, simpledialog, ttk
 
 from common import TS_FMT, make_tree, now, parse_int, rp, selected_id
 from make_order import CartPicker
+from receipt import show_preview
 
 ACTIVE = ("pending", "preparing", "ready")
 LABELS = {"pending": "Pending", "preparing": "Preparing", "ready": "READY",
@@ -92,7 +93,7 @@ class PreorderService:
                             (now(), pid))
 
     def complete(self, pid, paid, cashier):
-        """Customer picks up and pays. paid=None means exact. Returns (total, change)."""
+        """Customer picks up and pays. paid=None means exact. Returns (total, change, sale_id)."""
         with self.db:
             row = self._get(pid)
             if row["status"] != "ready":
@@ -104,10 +105,10 @@ class PreorderService:
                 raise ValueError(f"Cash received is short by {rp(total - paid)}.")
             lines = [(r["name"], r["price"], r["qty"]) for r in self.db.execute(
                 "SELECT name, price, qty FROM preorder_items WHERE preorder_id=?", (pid,))]
-            self.income.record_sale(lines, total, paid, cashier, "preorder")
+            sale_id = self.income.record_sale(lines, total, paid, cashier, "preorder")
             self.db.execute("UPDATE preorders SET status='picked_up', done_at=? WHERE id=?",
                             (now(), pid))
-        return total, paid - total
+        return total, paid - total, sale_id
 
 
 class NewPreorderTab(ttk.Frame):
@@ -233,12 +234,12 @@ class PreorderQueueTab(ttk.Frame):
             return
         try:
             paid = parse_int(text, "Cash received", allow_empty=True)
-            total, change = self.svc.complete(pid, paid, self.user["username"])
+            total, change, sale_id = self.svc.complete(pid, paid, self.user["username"])
         except ValueError as e:
             messagebox.showerror("Error", str(e), parent=top)
             return
         self.refresh()
-        messagebox.showinfo("Picked up", f"Total: {rp(total)}\nChange: {rp(change)}", parent=top)
+        show_preview(top, self.svc.income.get_sale(sale_id))
 
     def refresh(self):
         keep = self.tree.selection()
@@ -260,3 +261,4 @@ class PreorderQueueTab(ttk.Frame):
             return
         self.refresh()
         self.after(self.REFRESH_MS, self._tick)
+
