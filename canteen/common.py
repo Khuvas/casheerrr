@@ -115,3 +115,4 @@ def selected_id(tree):
     """Row id (as int) of the selected Treeview row, or None."""
     sel = tree.selection()
     return int(sel[0]) if sel else None
+
