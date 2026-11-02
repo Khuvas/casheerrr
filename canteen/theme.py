@@ -178,3 +178,4 @@ class ThemePicker(ttk.Frame):
         apply_theme(self.root, name)
         save_theme(name)
         self.mark()
+
