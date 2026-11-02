@@ -91,7 +91,11 @@ class MenuTab(ttk.Frame):
         win = tk.Toplevel(self)
         win.title("Edit item")
         win.transient(self.winfo_toplevel())
-        win.grab_set()
+        win.update_idletasks()
+        try:
+            win.grab_set()
+        except tk.TclError:
+            pass
         body = ttk.Frame(win, padding=10)
         body.pack(fill="both", expand=True)
         name, price = tk.StringVar(value=row["name"]), tk.StringVar(value=str(row["price"]))
@@ -125,3 +129,4 @@ class MenuTab(ttk.Frame):
         self.tree.delete(*self.tree.get_children())
         for r in self.svc.items():
             self.tree.insert("", "end", iid=str(r["id"]), values=(r["name"], rp(r["price"])))
+
