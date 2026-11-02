@@ -84,3 +84,4 @@ class StorageTab(ttk.Frame):
             label, tag = self.svc.status(r["stock"])
             self.tree.insert("", "end", iid=str(r["id"]),
                              values=(r["name"], r["stock"], label), tags=(tag,))
+
