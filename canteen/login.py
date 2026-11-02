@@ -224,3 +224,4 @@ class UsersTab(ttk.Frame):
         self.tree.delete(*self.tree.get_children())
         for u in self.auth.users():
             self.tree.insert("", "end", iid=str(u["id"]), values=(u["username"], u["role"]))
+
