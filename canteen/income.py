@@ -4,7 +4,8 @@ import tkinter as tk
 from datetime import datetime
 from tkinter import filedialog, messagebox, ttk
 
-from common import make_tree, now, rp
+from common import make_tree, now, rp, selected_id
+from receipt import show_preview
 
 
 class IncomeService:
@@ -41,9 +42,21 @@ class IncomeService:
             "SELECT substr(ts,1,10) d, COUNT(*) n, SUM(total) t "
             "FROM sales GROUP BY d ORDER BY d DESC").fetchall()
 
+    def get_sale(self, sale_id):
+        """One sale with its items, as a dict (used to build receipts)."""
+        s = self.db.execute("SELECT * FROM sales WHERE id=?", (sale_id,)).fetchone()
+        if s is None:
+            raise ValueError("Sale not found.")
+        items = self.db.execute(
+            "SELECT name, price, qty FROM sale_items WHERE sale_id=? ORDER BY rowid",
+            (sale_id,)).fetchall()
+        return {"id": s["id"], "ts": s["ts"], "cashier": s["cashier"], "source": s["source"],
+                "total": s["total"], "paid": s["paid"],
+                "items": [(i["name"], i["price"], i["qty"]) for i in items]}
+
     def recent_sales(self, limit=50):
         return self.db.execute(
-            "SELECT s.ts, s.total, s.cashier, s.source, "
+            "SELECT s.id, s.ts, s.total, s.cashier, s.source, "
             "(SELECT group_concat(name || ' x' || qty, ', ') FROM sale_items WHERE sale_id=s.id) items "
             "FROM sales s ORDER BY s.id DESC LIMIT ?", (limit,)).fetchall()
 
@@ -95,7 +108,8 @@ class IncomeTab(ttk.Frame):
 
         bar = ttk.Frame(self)
         bar.pack(fill="x")
-        ttk.Button(bar, text="Export CSV", command=self.export).pack(side="left")
+        ttk.Button(bar, text="View receipt", command=self.view_receipt).pack(side="left")
+        ttk.Button(bar, text="Export CSV", command=self.export).pack(side="left", padx=6)
         ttk.Button(bar, text="Reset income records", command=self.reset).pack(side="left", padx=6)
         self.refresh()
 
@@ -110,7 +124,16 @@ class IncomeTab(ttk.Frame):
         self.sale_tree.delete(*self.sale_tree.get_children())
         for r in self.svc.recent_sales():
             by = (r["cashier"] or "—") + (" · pre-order" if r["source"] == "preorder" else "")
-            self.sale_tree.insert("", "end", values=(r["ts"], r["items"], by, rp(r["total"])))
+            self.sale_tree.insert("", "end", iid=str(r["id"]),
+                                  values=(r["ts"], r["items"], by, rp(r["total"])))
+
+    def view_receipt(self):
+        top = self.winfo_toplevel()
+        sale_id = selected_id(self.sale_tree)
+        if sale_id is None:
+            messagebox.showinfo("Receipt", "Select a transaction first.", parent=top)
+            return
+        show_preview(top, self.svc.get_sale(sale_id))
 
     def export(self):
         top = self.winfo_toplevel()
@@ -126,3 +149,4 @@ class IncomeTab(ttk.Frame):
                                icon="warning", parent=self.winfo_toplevel()):
             self.svc.reset()
             self.refresh()
+
